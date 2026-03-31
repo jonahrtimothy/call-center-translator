@@ -1,0 +1,14 @@
+Buenos días, gracias por llamar al servicio al cliente. Mi nombre es Carlos.
+¿En qué le puedo ayudar hoy?
+
+Hola Carlos, llamo porque tengo un problema con mi factura.
+El mes pasado me cobraron dos veces y todavía no me han devuelto el dinero.
+
+Entiendo su frustración señor. ¿Me puede dar su número de cuenta
+para poder verificar los cargos en el sistema?
+
+Sí, claro. Mi número de cuenta es 4521-8834. También quiero saber
+cuánto tiempo tardan en procesar el reembolso.
+
+Normalmente el reembolso tarda entre tres y cinco días hábiles.
+Voy a escalar su caso a nuestro departamento de facturación ahora mismo.
