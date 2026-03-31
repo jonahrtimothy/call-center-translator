@@ -11,52 +11,63 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No text provided" }, { status: 400 });
     }
 
-    // Truncate very long texts to avoid token limits
-    const truncated = text.length > 3000 ? text.slice(0, 3000) + "..." : text;
+    const truncated =
+      text.length > 2000 ? text.slice(0, 2000) + "..." : text;
 
-    const message = await client.messages.create({
+    // Step 1 — detect language (fast, tiny call)
+    const detectMsg = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
+      max_tokens: 10,
       messages: [
         {
           role: "user",
-          content: `Detect the language of this text and translate it to ${targetLanguage || "English"}.
-
-Respond with ONLY a raw JSON object. No markdown, no code blocks, no explanation.
-Use exactly this format:
-{"detectedLanguage":"Spanish","translation":"translated text here","original":"original text here"}
-
-Text:
-${truncated}`,
-        },
-        {
-          role: "assistant",
-          content: "{",
+          content: `What language is this text? Reply with ONLY the language name, nothing else.\n\n${truncated.slice(0, 200)}`,
         },
       ],
     });
 
-    const raw =
-      message.content[0].type === "text" ? message.content[0].text : "";
+    const detectedLanguage =
+      detectMsg.content[0].type === "text"
+        ? detectMsg.content[0].text.trim()
+        : "Unknown";
 
-    // Reconstruct since we prefilled with "{"
-    const reconstructed = "{" + raw;
-
-    // Strip any accidental markdown
-    const clean = reconstructed
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
-
-    // Extract JSON object robustly
-    const jsonMatch = clean.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
+    // If already in target language, skip translation
+    if (
+      detectedLanguage.toLowerCase() ===
+      (targetLanguage || "english").toLowerCase()
+    ) {
+      return NextResponse.json({
+        detectedLanguage,
+        translation: truncated,
+        original: truncated,
+      });
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    // Step 2 — translate
+    const translateMsg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2048,
+      messages: [
+        {
+          role: "user",
+          content: `Translate the following ${detectedLanguage} text to ${targetLanguage || "English"}. 
+Reply with ONLY the translated text, no explanations, no labels.
 
-    return NextResponse.json(parsed);
+${truncated}`,
+        },
+      ],
+    });
+
+    const translation =
+      translateMsg.content[0].type === "text"
+        ? translateMsg.content[0].text.trim()
+        : "";
+
+    return NextResponse.json({
+      detectedLanguage,
+      translation,
+      original: truncated,
+    });
   } catch (error) {
     console.error("Translation error:", error);
     return NextResponse.json(
