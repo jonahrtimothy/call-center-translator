@@ -40,7 +40,8 @@ export default function LiveMode({ targetLanguage, sourceLanguage }: LiveModePro
   const [sourceLabel, setSourceLabel] = useState("");
   const [processingCount, setProcessingCount] = useState(0);
 
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -49,7 +50,6 @@ export default function LiveMode({ targetLanguage, sourceLanguage }: LiveModePro
   const targetLangRef = useRef(targetLanguage);
   const sourceLangRef = useRef(sourceLanguage);
 
-  // Keep refs in sync so async callbacks always use latest values
   useEffect(() => { targetLangRef.current = targetLanguage; }, [targetLanguage]);
   useEffect(() => { sourceLangRef.current = sourceLanguage; }, [sourceLanguage]);
 
@@ -60,12 +60,11 @@ export default function LiveMode({ targetLanguage, sourceLanguage }: LiveModePro
   useEffect(() => {
     return () => {
       recognitionRef.current?.stop();
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
       if (chunkIntervalRef.current) clearInterval(chunkIntervalRef.current);
     };
   }, []);
 
-  // Fire-and-forget translate — never blocks the caller
   const translateAsync = async (text: string) => {
     setProcessingCount((c) => c + 1);
     try {
@@ -96,8 +95,9 @@ export default function LiveMode({ targetLanguage, sourceLanguage }: LiveModePro
   };
 
   const startRecognition = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       setError("Speech recognition not supported. Please use Chrome.");
@@ -112,9 +112,7 @@ export default function LiveMode({ targetLanguage, sourceLanguage }: LiveModePro
         ? ""
         : langMap[sourceLangRef.current] || "";
 
-    let lastInterim = "";
-
-    recognition.onresult = (event) => {
+    recognition.onresult = (event: any) => {
       let interim = "";
       let final = "";
 
@@ -128,21 +126,18 @@ export default function LiveMode({ targetLanguage, sourceLanguage }: LiveModePro
       }
 
       setInterimText(interim);
-      lastInterim = interim;
 
       if (final.trim()) {
         setInterimText("");
-        lastInterim = "";
-        translateAsync(final.trim()); // fire and forget
+        translateAsync(final.trim());
       }
     };
 
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: any) => {
       if (event.error === "not-allowed") {
         setError("Microphone access denied. Please allow access and try again.");
         stopAll();
       }
-      // ignore no-speech
     };
 
     recognition.onend = () => {
@@ -212,7 +207,6 @@ export default function LiveMode({ targetLanguage, sourceLanguage }: LiveModePro
           if (chunks.length === 0) return;
           const blob = new Blob(chunks, { type: mimeType });
 
-          // Fire and forget — parallel processing
           (async () => {
             setProcessingCount((c) => c + 1);
             try {
@@ -241,12 +235,11 @@ export default function LiveMode({ targetLanguage, sourceLanguage }: LiveModePro
       startNewRecorder();
       setIsListening(true);
 
-      // Rotate recorder every 2.5s — parallel, not sequential
       chunkIntervalRef.current = setInterval(() => {
         const current = mediaRecorderRef.current;
         if (current && current.state === "recording") {
-          current.stop(); // triggers onstop → async processing
-          startNewRecorder(); // immediately starts next chunk
+          current.stop();
+          startNewRecorder();
         }
       }, CHUNK_INTERVAL);
 
@@ -302,7 +295,6 @@ export default function LiveMode({ targetLanguage, sourceLanguage }: LiveModePro
 
   return (
     <div>
-      {/* Source buttons */}
       <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
         {!isListening ? (
           <>
@@ -339,7 +331,6 @@ export default function LiveMode({ targetLanguage, sourceLanguage }: LiveModePro
 
       {error && <div style={errorBox}>{error}</div>}
 
-      {/* Subtitle feed */}
       <div style={feedBox}>
         {subtitles.length === 0 && !interimText && (
           <div style={emptyState}>
